@@ -1,0 +1,6 @@
+# Columna
+## A Lightweight Columnar Database in Common Lisp
+
+
+# License
+GPLv3+
