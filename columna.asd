@@ -11,4 +11,5 @@
   :version "0.0.1"
   :author "Z.Shang <shangzhanlin@gmail.com>"
   :license "GPL3"
-  :components ((:file "columna")))
+  :components ((:file "columna")
+               (:file "reader-macro" :depends-on ("columna"))))
