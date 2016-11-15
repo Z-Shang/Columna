@@ -59,6 +59,10 @@
   * a value that will be set to all matching values
   * a function that will be called at all matching positions
 
+* `enable-reader-macro` & `disable-reader-macro` 
+
+  toggle reader macro
+
 ### Selector
 
 A selector contains two slots:

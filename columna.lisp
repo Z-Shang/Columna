@@ -14,6 +14,7 @@
    #:lookup
    #:update
    #:del
+   #:get-pos
 
    ;;Reader-Macro:
    #:read-db-pos
