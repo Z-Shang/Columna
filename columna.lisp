@@ -16,6 +16,11 @@
    #:del
    #:get-pos
 
+   ;;File System IO
+   #:write-to-file
+   #:load-from-file
+   #:with-db-file
+
    ;;Reader-Macro:
    #:read-db-pos
    #:enable-reader-macro
