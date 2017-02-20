@@ -64,7 +64,6 @@
   (col nil :type symbol))
 
 (defun create-db (name)
-  (warn "Creating DB: ~A" name)
   (with-lock
     (if (symbolp name)
         (unless (gethash name *dbs*)
