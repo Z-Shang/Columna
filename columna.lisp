@@ -43,9 +43,6 @@
   `(bt:with-recursive-lock-held (*lock*)
      ,@body))
 
-(defun sym-to-keyword (sym)
-  (intern (write-to-string sym) :keyword))
-
 (defun first-nil (arr)
   (loop :for i :from 0 :to (1- (length arr))
      :when (null (aref arr i))
