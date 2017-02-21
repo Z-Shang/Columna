@@ -20,6 +20,7 @@
    ;;File System IO
    #:write-data-to-file
    #:load-data-from-file
+   #:load-data-from-file-to-db
    #:with-db-file
 
    ;;Reader-Macro:
