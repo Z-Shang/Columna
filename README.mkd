@@ -38,6 +38,12 @@
 
   => `(1 c1) (2 c2) (3 c3)` (This is ***NOT*** the return value)
 
+  or with predicators in the schema:
+  ```commonlisp
+  (create-with-schema db tb ((c1 #'pred1) (c2 #'pred2) (c3 #'pred3)))
+  ```
+  where the `pred*`s are functions that takes one argument and returns a boolean
+
 * `lookup` p table
 
   [integer] | selector -> table -> list

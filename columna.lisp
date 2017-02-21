@@ -6,6 +6,7 @@
   (:use :cl)
   (:export
    ;;DB-OPs:
+   #:set-db-path
    #:create-db
    #:create-table
    #:create-col
@@ -17,8 +18,8 @@
    #:get-pos
 
    ;;File System IO
-   #:write-to-file
-   #:load-from-file
+   #:write-data-to-file
+   #:load-data-from-file
    #:with-db-file
 
    ;;Reader-Macro:
@@ -27,7 +28,9 @@
    #:disable-reader-macro
 
    ;;Utils:
-   #:make-selector))
+   #:make-selector
+   #:_v
+   #:_i))
 
 (in-package :columna)
 
@@ -36,25 +39,26 @@
 
 (defparameter *dbs* (make-hash-table))
 (defparameter *lock* (bt:make-recursive-lock))
+(defparameter *default-db-path* #P"~/.columna/")
+
+(defun set-db-path (path)
+  (setf *default-db-path* path))
 
 (defmacro with-lock (&body body)
   `(bt:with-recursive-lock-held (*lock*)
      ,@body))
 
-(defun sym-to-keyword (sym)
-  (intern (write-to-string sym) :keyword))
-
 (defun first-nil (arr)
   (loop :for i :from 0 :to (1- (length arr))
-     :when (null (aref arr i))
-     :return i
-     :finally (return -1)))
+        :when (null (aref arr i))
+          :return i
+        :finally (return -1)))
 
 (defun lookup-table (name table)
   (loop :for i :from 0 :to (1- (length table))
-     :when (equal name (getf (aref table i) :name))
-     :return (getf (aref table i) :data)
-     :finally (return 'DNE)))
+        :when (equal name (getf (aref table i) :name))
+          :return (getf (aref table i) :data)
+        :finally (return 'DNE)))
 
 (defstruct db
   (name nil :type symbol)
@@ -66,34 +70,35 @@
 
 (defun create-db (name)
   (with-lock
-    (if (keywordp name)
-        (unless (gethash name *dbs*)
-          (setf (gethash name *dbs*) (make-db :name name :tables nil)))
-        (warn "Invalid name of type: ~A, must be a keyword" (type-of name)))))
+      (if (symbolp name)
+          (unless (gethash name *dbs*)
+            (setf (gethash name *dbs*) (make-db :name name :tables nil)))
+          (warn "Invalid name of type: ~A, must be a symbol" (type-of name)))))
 
 (defun create-table (name size db)
   (with-lock
-      (if (keywordp name)
+      (if (symbolp name)
           (if (and (> size 0)
                    (integerp size))
               (unless (getf (db-tables db) name)
                 (setf (getf (db-tables db) name)
                       (make-array size :initial-element nil)))
               (warn "Invalid size of table: ~A, must be a positive integer" size))
-          (warn "Invalid name of type: ~A, must be a keyword" (type-of name)))))
+          (warn "Invalid name of type: ~A, must be a symbol" (type-of name)))))
 
 (defun create-col (name table &optional &key pred)
   (with-lock
-      (if (keywordp name)
+      (if (symbolp name)
           (unless (< (first-nil table) 0)
             (setf (aref table (first-nil table))
-                  (list :name name :data (list)
+                  (list :name name
+                        :data (list)
                         :pred (if pred
                                   pred
                                   #'(lambda (x)
                                       (declare (ignore x))
                                       t)))))
-          (warn "Invalid name of type: ~A, must be a keyword" (type-of name)))))
+          (warn "Invalid name of type: ~A, must be a symbol" (type-of name)))))
 
 (defun insert (values table)
   (cond
@@ -108,19 +113,18 @@
                            :do (warn "Type: ~A of values at: ~A doesn't match the predicate of column" (type-of (nth i values)) i)
                          :always (nth i types))
                    (loop :for i :from 0 :to (1- (length table))
-                         :do (setf (getf (aref table i) :data)
-                                   (cons (nth i values)
-                                         (getf (aref table i) :data))))))
+                         :do (setf (getf (aref table i) :data) (cons (nth i values)
+                                                                     (getf (aref table i) :data))))))
              (warn "Values doesn't match table size: ~A" (length table)))))))
 
 (defun get-pos (&key db (table nil) (col nil) (pos nil))
-  (let ((d (gethash (sym-to-keyword db) *dbs*)))
+  (let ((d (gethash db *dbs*)))
     (if d
         (if table
-            (let ((tbl (getf (db-tables d) (sym-to-keyword table))))
+            (let ((tbl (getf (db-tables d) table)))
               (if tbl
                   (if col
-                      (let ((c (lookup-table (sym-to-keyword col) tbl)))
+                      (let ((c (lookup-table col tbl)))
                         (if (listp c)
                             (if pos
                                 (if (integerp pos)
@@ -147,19 +151,18 @@
   `(if (oddp (length ',body))
        (warn "Invalid number of arguments: ~A" (length ',body))
        (progn
-         (create-db (sym-to-keyword ',db))
+         (create-db ',db)
          (mapcam #'(lambda (tbl cols)
-                     (create-table (sym-to-keyword tbl)
+                     (create-table tbl
                                    (length cols)
                                    (get-pos :db ',db))
                      (mapcar #'(lambda (c)
                                  (if (consp c)
-                                     (create-col (sym-to-keyword (car c))
+                                     (create-col (car c)
                                                  (get-pos :db ',db :table tbl)
-                                                 :pred (eval (cdr c)))
-                                     (create-col (sym-to-keyword c)
-                                                 (get-pos :db ',db :table tbl)))
-                                 )
+                                                 :pred (eval (cadr c)))
+                                     (create-col c
+                                                 (get-pos :db ',db :table tbl))))
                              cols))
                  2
                  ',body))))
@@ -174,7 +177,7 @@
                            (remove-if (constantly t) (getf (aref table i) :data)
                                       :start p :count 1))))))
     (selector
-     (let ((pivot (lookup-table (sym-to-keyword (selector-col p))
+     (let ((pivot (lookup-table (selector-col p)
                                 table)))
        (if (equal pivot 'DNE)
            (error "Invalid selector with pivot column: ~A" (selector-col p))
@@ -202,7 +205,7 @@
                                   :collect (nth i
                                                 (getf (aref table j) :data)))))))
     (selector
-     (let ((pivot (lookup-table (sym-to-keyword (selector-col p)) table)))
+     (let ((pivot (lookup-table (selector-col p) table)))
        (if (equal pivot 'DNE)
            (error "Invalid selector with pivot column: ~A" (selector-col p))
            (with-lock
@@ -234,7 +237,7 @@
                                               (funcall n i (nth i (getf (aref table j) :data))))
                                         (setf (nth i (getf (aref table j) :data)) n))))))))
     (selector
-     (let ((pivot (lookup-table (sym-to-keyword (selector-col p)) table)))
+     (let ((pivot (lookup-table (selector-col p) table)))
        (if (equal pivot 'DNE)
            (error "Invalid argument, [integer] or selector only")
            (with-lock
@@ -251,3 +254,28 @@
                                             (setf (nth i (getf (aref table j) :data))
                                                   (funcall n i (nth i (getf (aref table j) :data))))
                                             (setf (nth i (getf (aref table j) :data)) n)))))))))))
+
+(defun _v (i v)
+  (declare (ignore i))
+  v)
+
+(defun _i (i v)
+  (declare (ignore v))
+  i)
+
+(defun write-data-to-file (db-name file-path)
+  (let ((db (gethash db-name *dbs*)))
+    (if (null db)
+        (error "DB: ~A Doesn't exist!" db-name)
+        (progn
+          (ensure-directories-exist file-path)
+          (with-open-file (file (merge-pathnames (make-pathname :name (write-to-string db-name)) file-path)
+                                :direction :output
+                                :if-exists :supersede
+                                :if-does-not-exist :create)
+            (let ((tbls (mapcam #'(lambda (x y)  (cons x y)) 2 (db-tables db))))
+              (loop for tbl in tbls do
+                (write-to-string (list :n (car tbl)
+                                       :v (loop for c being the elements of (cdr tbl)
+                                                collect (getf c :data)))
+                                 file))))))))
