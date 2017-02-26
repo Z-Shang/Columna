@@ -16,6 +16,7 @@
    #:update
    #:del
    #:get-pos
+   #:take
 
    ;;File System IO
    #:write-data-to-file
@@ -71,52 +72,52 @@
 
 (defun create-db (name)
   (with-lock
-      (if (symbolp name)
-          (unless (gethash name *dbs*)
-            (setf (gethash name *dbs*) (make-db :name name :tables nil)))
-          (warn "Invalid name of type: ~A, must be a symbol" (type-of name)))))
+    (if (symbolp name)
+        (unless (gethash name *dbs*)
+          (setf (gethash name *dbs*) (make-db :name name :tables nil)))
+        (warn "Invalid name of type: ~A, must be a symbol" (type-of name)))))
 
 (defun create-table (name size db)
   (with-lock
-      (if (symbolp name)
-          (if (and (> size 0)
-                   (integerp size))
-              (unless (getf (db-tables db) name)
-                (setf (getf (db-tables db) name)
-                      (make-array size :initial-element nil)))
-              (warn "Invalid size of table: ~A, must be a positive integer" size))
-          (warn "Invalid name of type: ~A, must be a symbol" (type-of name)))))
+    (if (symbolp name)
+        (if (and (> size 0)
+                 (integerp size))
+            (unless (getf (db-tables db) name)
+              (setf (getf (db-tables db) name)
+                    (make-array size :initial-element nil)))
+            (warn "Invalid size of table: ~A, must be a positive integer" size))
+        (warn "Invalid name of type: ~A, must be a symbol" (type-of name)))))
 
 (defun create-col (name table &optional &key pred)
   (with-lock
-      (if (symbolp name)
-          (unless (< (first-nil table) 0)
-            (setf (aref table (first-nil table))
-                  (list :name name
-                        :data (list)
-                        :pred (if pred
-                                  pred
-                                  #'(lambda (x)
-                                      (declare (ignore x))
-                                      t)))))
-          (warn "Invalid name of type: ~A, must be a symbol" (type-of name)))))
+    (if (symbolp name)
+        (unless (< (first-nil table) 0)
+          (setf (aref table (first-nil table))
+                (list :name name
+                      :data (list)
+                      :pred (if pred
+                                pred
+                                #'(lambda (x)
+                                    (declare (ignore x))
+                                    t)))))
+        (warn "Invalid name of type: ~A, must be a symbol" (type-of name)))))
 
 (defun insert (values table)
   (cond
     ((listp values)
      (with-lock
-         (if (= (length values) (length table))
-             (let ((types
-                     (loop :for i :from 0 :to (1- (length table))
-                           :collect (funcall (getf (aref table i) :pred) (nth i values)))))
-               (if (loop :for i :from 0 :to (1- (length types))
-                         :when (not (nth i types))
-                           :do (warn "Type: ~A of values at: ~A doesn't match the predicate of column" (type-of (nth i values)) i)
-                         :always (nth i types))
+       (if (= (length values) (length table))
+           (let ((types
                    (loop :for i :from 0 :to (1- (length table))
-                         :do (setf (getf (aref table i) :data) (cons (nth i values)
-                                                                     (getf (aref table i) :data))))))
-             (warn "Values doesn't match table size: ~A" (length table)))))))
+                         :collect (funcall (getf (aref table i) :pred) (nth i values)))))
+             (if (loop :for i :from 0 :to (1- (length types))
+                       :when (not (nth i types))
+                         :do (warn "Type: ~A of values at: ~A doesn't match the predicate of column" (type-of (nth i values)) i)
+                       :always (nth i types))
+                 (loop :for i :from 0 :to (1- (length table))
+                       :do (setf (getf (aref table i) :data) (cons (nth i values)
+                                                                   (getf (aref table i) :data))))))
+           (warn "Values doesn't match table size: ~A" (length table)))))))
 
 (defun get-pos (&key db (table nil) (col nil) (pos nil))
   (let ((d (gethash db *dbs*)))
@@ -172,28 +173,28 @@
   (typecase p
     (integer
      (with-lock
-         (let ((l (1- (length table))))
-           (loop :for i :from 0 :to l
-                 :do (setf (getf (aref table i) :data)
-                           (remove-if (constantly t) (getf (aref table i) :data)
-                                      :start p :count 1))))))
+       (let ((l (1- (length table))))
+         (loop :for i :from 0 :to l
+               :do (setf (getf (aref table i) :data)
+                         (remove-if (constantly t) (getf (aref table i) :data)
+                                    :start p :count 1))))))
     (selector
      (let ((pivot (lookup-table (selector-col p)
                                 table)))
        (if (equal pivot 'DNE)
            (error "Invalid selector with pivot column: ~A" (selector-col p))
            (with-lock
-               (let* ((l (1- (length pivot)))
-                      (r
-                        (loop :for i :from 0 :to l
-                              :when (not (funcall (selector-pred p) (nth i pivot)))
-                                :collect (loop :for j :from 0 :to (1- (length table))
-                                               :collect (nth i (getf (aref table j) :data)))))
-                      (res (loop :for i :from 0 :to (1- (length (car r)))
-                                 :collect (mapcar #'(lambda (l) (nth i l)) r))))
-                 (loop :for i :from 0 :to (1- (length table))
-                       :do (setf (getf (aref table i) :data)
-                                 (nth i res))))))))))
+             (let* ((l (1- (length pivot)))
+                    (r
+                      (loop :for i :from 0 :to l
+                            :when (not (funcall (selector-pred p) (nth i pivot)))
+                              :collect (loop :for j :from 0 :to (1- (length table))
+                                             :collect (nth i (getf (aref table j) :data)))))
+                    (res (loop :for i :from 0 :to (1- (length (car r)))
+                               :collect (mapcar #'(lambda (l) (nth i l)) r))))
+               (loop :for i :from 0 :to (1- (length table))
+                     :do (setf (getf (aref table i) :data)
+                               (nth i res))))))))))
 
 (defun lookup (p table)
   (typecase p
@@ -201,19 +202,19 @@
      (if (loop :for i :in p :thereis (not (integerp i)))
          (error "Invalid argument, [integer] or selector only")
          (with-lock
-             (loop :for i :in p
-                   :collect (loop :for j :from 0 :to (1- (length table))
-                                  :collect (nth i
-                                                (getf (aref table j) :data)))))))
+           (loop :for i :in p
+                 :collect (loop :for j :from 0 :to (1- (length table))
+                                :collect (nth i
+                                              (getf (aref table j) :data)))))))
     (selector
      (let ((pivot (lookup-table (selector-col p) table)))
        (if (equal pivot 'DNE)
            (error "Invalid selector with pivot column: ~A" (selector-col p))
            (with-lock
-               (loop :for i :from 0 :to (1- (length pivot))
-                     :when (funcall (selector-pred p) (nth i pivot))
-                       :collect (loop :for j :from 0 :to (1- (length table))
-                                      :collect (nth i (getf (aref table j) :data))))))))))
+             (loop :for i :from 0 :to (1- (length pivot))
+                   :when (funcall (selector-pred p) (nth i pivot))
+                     :collect (loop :for j :from 0 :to (1- (length table))
+                                    :collect (nth i (getf (aref table j) :data))))))))))
 
 ;;N could be a function that takes the index and the current value
 (defun update (p n table)
@@ -225,36 +226,41 @@
      (if (loop :for i :in p :thereis (not (integerp i)))
          (error "Invalid argument, [integer] or selector only")
          (with-lock
-             (loop :for i :in p
-                   :do (loop :for j :from 0 :to (1- (length table))
-                             :do
-                                (if (listp n)
-                                    (if (functionp (nth j n))
-                                        (setf (nth i (getf (aref table j) :data))
-                                              (funcall (nth j n) i (nth i (getf (aref table j) :data))))
-                                        (setf (nth i (getf (aref table j) :data)) (nth j n)))
-                                    (if (functionp n)
-                                        (setf (nth i (getf (aref table j) :data))
-                                              (funcall n i (nth i (getf (aref table j) :data))))
-                                        (setf (nth i (getf (aref table j) :data)) n))))))))
+           (loop :for i :in p
+                 :do (loop :for j :from 0 :to (1- (length table))
+                           :do
+                              (if (listp n)
+                                  (if (functionp (nth j n))
+                                      (setf (nth i (getf (aref table j) :data))
+                                            (funcall (nth j n) i (nth i (getf (aref table j) :data))))
+                                      (setf (nth i (getf (aref table j) :data)) (nth j n)))
+                                  (if (functionp n)
+                                      (setf (nth i (getf (aref table j) :data))
+                                            (funcall n i (nth i (getf (aref table j) :data))))
+                                      (setf (nth i (getf (aref table j) :data)) n))))))))
     (selector
      (let ((pivot (lookup-table (selector-col p) table)))
        (if (equal pivot 'DNE)
            (error "Invalid argument, [integer] or selector only")
            (with-lock
-               (loop :for i :from 0 :to (1- (length pivot))
-                     :when (funcall (selector-pred p) (nth i pivot))
-                       :do (loop :for j :from 0 :to (1- (length table))
-                                 :do
-                                    (if (listp n)
-                                        (if (functionp (nth j n))
-                                            (setf (nth i (getf (aref table j) :data))
-                                                  (funcall (nth j n) i (nth i (getf (aref table j) :data))))
-                                            (setf (nth i (getf (aref table j) :data)) (nth j n)))
-                                        (if (functionp n)
-                                            (setf (nth i (getf (aref table j) :data))
-                                                  (funcall n i (nth i (getf (aref table j) :data))))
-                                            (setf (nth i (getf (aref table j) :data)) n)))))))))))
+             (loop :for i :from 0 :to (1- (length pivot))
+                   :when (funcall (selector-pred p) (nth i pivot))
+                     :do (loop :for j :from 0 :to (1- (length table))
+                               :do
+                                  (if (listp n)
+                                      (if (functionp (nth j n))
+                                          (setf (nth i (getf (aref table j) :data))
+                                                (funcall (nth j n) i (nth i (getf (aref table j) :data))))
+                                          (setf (nth i (getf (aref table j) :data)) (nth j n)))
+                                      (if (functionp n)
+                                          (setf (nth i (getf (aref table j) :data))
+                                                (funcall n i (nth i (getf (aref table j) :data))))
+                                          (setf (nth i (getf (aref table j) :data)) n)))))))))))
+
+(defun take (n table)
+  (when (not (integerp n))
+    (error "~A is not an integer!" n))
+  (lookup (loop :for n :from 0 :to (1- n) :collect n) table))
 
 (defun _v (i v)
   (declare (ignore i))
@@ -268,15 +274,34 @@
   (let ((db (gethash db-name *dbs*)))
     (if (null db)
         (error "DB: ~A Doesn't exist!" db-name)
-        (progn
-          (ensure-directories-exist file-path)
-          (with-open-file (file (merge-pathnames (make-pathname :name (write-to-string db-name)) file-path)
-                                :direction :output
-                                :if-exists :supersede
-                                :if-does-not-exist :create)
-            (let ((tbls (mapcam #'(lambda (x y)  (cons x y)) 2 (db-tables db))))
-              (loop for tbl in tbls do
-                (write-to-string (list :n (car tbl)
-                                       :v (loop for c being the elements of (cdr tbl)
-                                                collect (getf c :data)))
-                                 file))))))))
+        (with-lock
+          (progn
+            (ensure-directories-exist file-path)
+            (with-open-file (file (merge-pathnames (make-pathname :name (write-to-string db-name)) file-path)
+                                  :direction :output
+                                  :if-exists :supersede
+                                  :if-does-not-exist :create)
+              (let ((tbls (mapcam #'(lambda (x y)  (cons x y)) 2 (db-tables db))))
+                (loop for tbl in tbls do
+                  (format file "~A~%" (write-to-string (list :n (car tbl)
+                                                             :v (loop for c being the elements of (cdr tbl)
+                                                                      collect (getf c :data)))))))))))))
+
+(defun load-data-from-file-to-db (file-path db &key (override nil))
+  (with-open-file (file file-path :direction :input :if-does-not-exist nil)
+    (if (null file)
+        (error "DB File: ~A Doesn't exist!" file-path)
+        (with-lock
+          (when file
+            (loop :for line = (read-line file nil)
+                  :while line
+                  :do (let* ((data (read-from-string line))
+                             (tbl-name (getf data :n))
+                             (values (getf data :v))
+                             (tbl (getf (db-tables db) tbl-name)))
+                        (loop :for i :from 0 :to (1- (length values))
+                              :do (if override
+                                      (setf (getf (aref tbl i) :data)
+                                            (nth i values))
+                                      (setf (getf (aref tbl i) :data)
+                                            (append (nth i values) (getf (aref tbl i) :data))))))))))))

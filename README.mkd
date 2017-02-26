@@ -64,6 +64,20 @@
   * a list of functions (one function for on column respectively) that takes two arguments: the index of the target position and current value of the target position
   * a value that will be set to all matching values
   * a function that will be called at all matching positions
+  
+* `write-data-to-file` db-name file-path
+
+  symbol -> pathname -> IO nil
+  
+  `file-path` should be a directory, and the db file will be created using `db-name`
+  
+  This function can only export the data in the db, but not the predicators of every column.
+
+* `load-data-from-file-to-db` file-path db `&key` override
+  
+  pathname -> DB -> (boolean) -> IO nil
+  
+  `db` should be already created with columns created matching the db file. If `override` is set to `t`, the data (if any) currently in the db will be erased.
 
 * `enable-reader-macro` & `disable-reader-macro` 
 
