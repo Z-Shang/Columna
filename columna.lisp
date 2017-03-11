@@ -57,10 +57,12 @@
         :finally (return -1)))
 
 (defun lookup-table (name table)
-  (loop :for i :from 0 :to (1- (length table))
-        :when (equal name (getf (aref table i) :name))
-          :return (getf (aref table i) :data)
-        :finally (return 'DNE)))
+  (if (listp name)
+      (mapcar #'(lambda (n) (list 'quote (lookup-table n table))) name)
+      (loop :for i :from 0 :to (1- (length table))
+            :when (equal name (getf (aref table i) :name))
+              :return (getf (aref table i) :data)
+            :finally (return 'DNE))))
 
 (defstruct db
   (name nil :type symbol)
@@ -68,7 +70,7 @@
 
 (defstruct selector
   (pred nil :type function)
-  (col nil :type symbol))
+  (col nil :type (or symbol list)))
 
 (defun create-db (name)
   (with-lock
@@ -207,14 +209,25 @@
                                 :collect (nth i
                                               (getf (aref table j) :data)))))))
     (selector
-     (let ((pivot (lookup-table (selector-col p) table)))
-       (if (equal pivot 'DNE)
-           (error "Invalid selector with pivot column: ~A" (selector-col p))
-           (with-lock
-             (loop :for i :from 0 :to (1- (length pivot))
-                   :when (funcall (selector-pred p) (nth i pivot))
-                     :collect (loop :for j :from 0 :to (1- (length table))
-                                    :collect (nth i (getf (aref table j) :data))))))))))
+     (if (listp (selector-col p))
+         (let ((pivots (lookup-table (selector-col p) table)))
+           (if (loop :for piv :in pivots :thereis (equalp piv 'DNE))
+               (error "Invalid selector with pivot columns: ~A" (selector-col p))
+               (if (> (length (remove-duplicates (mapcar #'length pivots))) 1)
+                   (error "The pivot columns' lengths don't match")
+                   (let ((marks (eval `(mapcar ,(selector-pred p) ,@pivots))))
+                     (loop :for i :from 0 :to (1- (length marks))
+                           :when (nth i marks)
+                             :collect (loop :for j :from 0 :to (1- (length table))
+                                            :collect (nth i (getf (aref table j) :data))))))))
+         (let ((pivot (lookup-table (selector-col p) table)))
+           (if (equal pivot 'DNE)
+               (error "Invalid selector with pivot column: ~A" (selector-col p))
+               (with-lock
+                 (loop :for i :from 0 :to (1- (length pivot))
+                       :when (funcall (selector-pred p) (nth i pivot))
+                         :collect (loop :for j :from 0 :to (1- (length table))
+                                        :collect (nth i (getf (aref table j) :data)))))))))))
 
 ;;N could be a function that takes the index and the current value
 (defun update (p n table)
