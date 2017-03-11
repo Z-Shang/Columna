@@ -87,14 +87,14 @@
 
 A selector contains two slots:
 
-* `col` indicated the target column
-* `pred` a predicate used for testing values in the target column
+* `col` indicated the target column(s)
+* `pred` a predicate used for testing values in the target column(s)
 
 ### Reader Macros
 
 You can use `[db table column index]` to access the elements in the database, `[db]` is equivalent to `(get-pos :db db)`, `[db table]` is equivalent to `(get-pos :db db :table table)`, etc.
 
-You can use `$col pred` to generate a selector, `$col pred` is equivalent to `(make-selector :col col :pred pred)`.
+You can use `$col pred` to generate a selector, `$col pred` is equivalent to `(make-selector :col col :pred pred)`, and of course, `$(c1 c2 c3) pred` is equivalent to `(make-selector :col (list c1 c2 c3) :pred pred)`.
 
 
 # License
