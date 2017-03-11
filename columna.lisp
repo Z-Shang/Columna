@@ -257,7 +257,7 @@
          (let ((pivots (lookup-table (selector-col p) table)))
            (if (loop :for piv :in pivots :thereis (equalp piv 'DNE))
                (error "Invalid argument, [integer] or selector only")
-               (if (> (length (remove-duplicates (mapcar #'length pivots))))
+               (if (> (length (remove-duplicates (mapcar #'length pivots))) 1)
                    (error "The pivot columns' lengths don't match")
                    (let ((marks (eval `(mapcar ,(selector-pred p) ,@pivots))))
                      (with-lock
