@@ -1,6 +1,9 @@
 # Columna
 ## A Lightweight Columnar Database in Common Lisp
 
+# Next Step
+Change this into a standalone database that accepts socket connection, instead of an embedding database.
+
 # Usage
 
 * `create-db` name
@@ -95,7 +98,6 @@ A selector contains two slots:
 You can use `[db table column index]` to access the elements in the database, `[db]` is equivalent to `(get-pos :db db)`, `[db table]` is equivalent to `(get-pos :db db :table table)`, etc.
 
 You can use `$col pred` to generate a selector, `$col pred` is equivalent to `(make-selector :col col :pred pred)`, and of course, `$(c1 c2 c3) pred` is equivalent to `(make-selector :col (list c1 c2 c3) :pred pred)`.
-
 
 # License
 GPLv3+
