@@ -17,6 +17,7 @@
    #:del
    #:get-pos
    #:take
+   #:mapcol
 
    ;;File System IO
    #:write-data-to-file
@@ -296,6 +297,14 @@
   (when (not (integerp n))
     (error "~A is not an integer!" n))
   (lookup (loop :for n :from 0 :to (1- n) :collect n) table))
+
+;; Map a function over a table
+(defun mapcol (fn tbl)
+  (with-lock
+    (let ((table (loop :for p :from 0 :to (1- (length tbl)) :collect (aref tbl p))))
+      (apply #'(lambda (lst)
+                 (mapcar fn lst))
+             table))))
 
 (defun _v (i v)
   (declare (ignore i))

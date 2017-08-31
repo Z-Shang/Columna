@@ -68,6 +68,18 @@ Change this into a standalone database that accepts socket connection, instead o
   * a value that will be set to all matching values
   * a function that will be called at all matching positions
   
+* `take` n table
+
+  n -> table -> [row]
+
+  Take the first `n` rows of `table`
+  
+* `mapcol` fn table
+
+  (a -> b ... -> n) -> table -> [n]
+
+  Map `fn` over columns of `table`
+  
 * `write-data-to-file` db-name file-path
 
   symbol -> pathname -> IO nil
