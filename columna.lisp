@@ -301,10 +301,8 @@
 ;; Map a function over a table
 (defun mapcol (fn tbl)
   (with-lock
-    (let ((table (loop :for p :from 0 :to (1- (length tbl)) :collect (aref tbl p))))
-      (apply #'(lambda (lst)
-                 (mapcar fn lst))
-             table))))
+    (let ((table (loop :for p :from 0 :to (1- (length tbl)) :collect (cons 'list (getf (aref tbl p) :data)))))
+      (eval `(mapcar ,fn ,@table)))))
 
 (defun _v (i v)
   (declare (ignore i))
