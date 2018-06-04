@@ -112,4 +112,4 @@ You can use `[db table column index]` to access the elements in the database, `[
 You can use `$col pred` to generate a selector, `$col pred` is equivalent to `(make-selector :col col :pred pred)`, and of course, `$(c1 c2 c3) pred` is equivalent to `(make-selector :col (list c1 c2 c3) :pred pred)`.
 
 # License
-GPLv3+
+AGPLv3+
